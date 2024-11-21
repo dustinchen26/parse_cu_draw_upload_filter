@@ -1,3 +1,4 @@
+修改底下html，支持多個文件上傳，多個文件檔由檔名小到大處理，合併畫圖
 <!-- 
   Copyright © [2023] [Dustin_Chen]. All rights reserved.
   Author: Dustin_Chen
@@ -73,52 +74,27 @@
         let chart1 = null;  // Store the UDP-UL-Tx chart instance
         let chart2 = null;  // Store the UDP-DL-Tx chart instance
 
-        let parsedData = {
-            timestampsUl: [],
-            udpUlTxValues: [],
-            timestampsDl: [],
-            udpDlTxValues: []
-        };
+        let parsedData = {};
 
         // Function to handle the file upload
         function handleFileUpload(event) {
-            const files = event.target.files;
-            if (files.length > 0) {
-                const fileArray = Array.from(files);
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
 
-                // Sort files by name (ascending order)
-                fileArray.sort((a, b) => a.name.localeCompare(b.name));
+                reader.onload = function(e) {
+                    const fileContent = e.target.result;
+                    parseContent(fileContent);
+                };
 
-                // Read and process each file sequentially
-                Promise.all(fileArray.map(file => readFile(file)))
-                    .then(fileContents => {
-                        // Combine all file data
-                        fileContents.forEach(content => {
-                            parseContent(content);
-                        });
+                reader.onerror = function(e) {
+                    alert("Failed to read file!");
+                };
 
-                        // After all files are processed, apply filters and draw the charts
-                        applyFilters();
-                    })
-                    .catch(error => alert("Error reading files: " + error));
+                reader.readAsText(file);  // Read the file as text
             }
         }
 
-        // Function to read a file as text
-        function readFile(file) {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    resolve(e.target.result);  // Return the content of the file
-                };
-                reader.onerror = function() {
-                    reject("Failed to read file: " + file.name);
-                };
-                reader.readAsText(file);  // Read the file as text
-            });
-        }
-
-        // Function to parse the content of each file
         function parseContent(fileContent) {
             var lines = fileContent.split("\n");
             var timestampsUl = [];
@@ -156,14 +132,18 @@
                 }
             }
 
-            // Merge parsed data from each file
-            parsedData.timestampsUl = parsedData.timestampsUl.concat(timestampsUl);
-            parsedData.udpUlTxValues = parsedData.udpUlTxValues.concat(udpUlTxValues);
-            parsedData.timestampsDl = parsedData.timestampsDl.concat(timestampsDl);
-            parsedData.udpDlTxValues = parsedData.udpDlTxValues.concat(udpDlTxValues);
+            // Store parsed data for later use
+            parsedData = {
+                timestampsUl: timestampsUl,
+                udpUlTxValues: udpUlTxValues,
+                timestampsDl: timestampsDl,
+                udpDlTxValues: udpDlTxValues
+            };
+
+            // After parsing, apply filters
+            applyFilters();
         }
 
-        // Function to apply the filters and draw the charts
         function applyFilters() {
             const ulFilterValue = parseFloat(document.getElementById('ulFilter').value);
             const dlFilterValue = parseFloat(document.getElementById('dlFilter').value);
@@ -213,7 +193,6 @@
             }
         }
 
-        // Function to draw the charts
         function drawCharts(filteredUlData, filteredDlData) {
             clearCharts();  // Clear previous charts
 
@@ -224,7 +203,6 @@
             drawChart(filteredDlData.timestampsDl, filteredDlData.udpDlTxValues, 'chart2', 'UDP-DL-Tx Throughput (Mbps)', 'blue');
         }
 
-        // Function to create individual charts
         function drawChart(timestamps, dataValues, chartId, label, borderColor) {
             var ctx = document.getElementById(chartId).getContext('2d');
 
@@ -277,7 +255,6 @@
             }
         }
 
-        // Function to clear existing charts
         function clearCharts() {
             // Destroy charts if they exist
             if (chart1) {
@@ -304,8 +281,8 @@
 
     <div>
         <br>
-        <label for="fileInput">● Please upload the "cu_stats_XXX.txt" files to parse:</label><br>
-        <input type="file" id="fileInput" accept=".txt" multiple onchange="handleFileUpload(event)"><br>
+        <label for="fileInput">● Please upload the "cu_stats_XXX.txt" file to parse:</label><br>
+        <input type="file" id="fileInput" accept=".txt" onchange="handleFileUpload(event)"><br>
     </div>
 
     <div id="filterContainer">
